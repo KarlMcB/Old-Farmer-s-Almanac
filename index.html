@@ -74,12 +74,24 @@
       align-items: center;
     }
 
+    .location-row {
+      flex: 0 0 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding-top: 12px;
+      margin-top: 2px;
+      border-top: 1px solid rgba(70, 45, 18, 0.14);
+    }
+
     label {
       font-size: 0.95rem;
       color: var(--muted);
     }
 
     input,
+    select,
     button {
       border: 1px solid rgba(76, 51, 25, 0.24);
       border-radius: 999px;
@@ -91,6 +103,17 @@
       padding: 10px 14px;
       background: rgba(255, 250, 238, 0.95);
       color: var(--ink);
+    }
+
+    #cityInput {
+      width: 200px;
+    }
+
+    select {
+      padding: 10px 14px;
+      background: rgba(255, 250, 238, 0.95);
+      color: var(--ink);
+      cursor: pointer;
     }
 
     button {
@@ -112,14 +135,10 @@
       background: rgba(255, 247, 230, 0.9);
     }
 
-    select {
-      padding: 10px 14px;
-      border: 1px solid rgba(76, 51, 25, 0.24);
-      border-radius: 999px;
-      font: inherit;
-      background: rgba(255, 250, 238, 0.95);
-      color: var(--ink);
-      cursor: pointer;
+    .station-label {
+      font-size: 0.88rem;
+      color: var(--muted);
+      font-style: italic;
     }
 
     .pages {
@@ -253,6 +272,10 @@
       padding: 7px 8px 8px;
     }
 
+    .has-tides .calendar td.day {
+      height: 150px;
+    }
+
     .day.off-month {
       background: rgba(112, 91, 58, 0.08);
       color: rgba(46, 34, 20, 0.45);
@@ -297,6 +320,18 @@
       color: #355d2d;
       font-weight: 700;
     }
+
+    .tide-info {
+      margin-top: 5px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(130, 97, 52, 0.18);
+      font-size: 0.63rem;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .tide-H { color: #2a5f8f; }
+    .tide-L { color: #7a6040; }
 
     .notes-grid {
       display: grid;
@@ -365,6 +400,10 @@
         height: 88px;
         padding: 6px;
       }
+
+      .has-tides .calendar td.day {
+        height: 130px;
+      }
     }
 
     @media print {
@@ -423,6 +462,13 @@
         <button id="generateBtn">Generate</button>
         <button id="currentBtn" class="secondary">Today</button>
         <button id="printBtn" class="secondary">Print</button>
+      </div>
+      <div class="location-row">
+        <label for="cityInput">Tides for</label>
+        <input id="cityInput" type="text" placeholder="e.g. Boston, MA">
+        <button id="tidesBtn">Find Tides</button>
+        <button id="clearTidesBtn" class="secondary">Clear</button>
+        <span id="stationLabel" class="station-label">No tide station set</span>
       </div>
     </section>
 
@@ -489,6 +535,11 @@
       { month: 11, day: 21, label: "Winter Begins" }
     ];
 
+    // Tide state
+    let tideStation = null;
+    let tideCache = {};
+    let noaaStations = null;
+
     const today = new Date();
     const pagesEl = document.getElementById("pages");
     const yearInput = document.getElementById("yearInput");
@@ -496,6 +547,10 @@
     const generateBtn = document.getElementById("generateBtn");
     const currentBtn = document.getElementById("currentBtn");
     const printBtn = document.getElementById("printBtn");
+    const cityInput = document.getElementById("cityInput");
+    const tidesBtn = document.getElementById("tidesBtn");
+    const clearTidesBtn = document.getElementById("clearTidesBtn");
+    const stationLabel = document.getElementById("stationLabel");
 
     yearInput.value = today.getFullYear();
     monthSelect.value = today.getMonth();
@@ -507,11 +562,21 @@
       renderMonth(today.getFullYear(), today.getMonth());
     });
     printBtn.addEventListener("click", () => window.print());
-
     yearInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") renderMonth(parseYearInput(), parseMonthSelect());
     });
     monthSelect.addEventListener("change", () => renderMonth(parseYearInput(), parseMonthSelect()));
+
+    tidesBtn.addEventListener("click", () => findTidesForCity(cityInput.value.trim()));
+    cityInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") findTidesForCity(cityInput.value.trim());
+    });
+    clearTidesBtn.addEventListener("click", () => {
+      tideStation = null;
+      tideCache = {};
+      stationLabel.textContent = "No tide station set";
+      renderMonth(parseYearInput(), parseMonthSelect());
+    });
 
     function parseYearInput() {
       const year = Number.parseInt(yearInput.value, 10);
@@ -526,18 +591,139 @@
       return Number.parseInt(monthSelect.value, 10);
     }
 
-    function renderMonth(year, month) {
+    async function renderMonth(year, month) {
       pagesEl.innerHTML = "";
       const seasonalMap = new Map(
         fixedSeasonMarkers.map((marker) => [`${marker.month}-${marker.day}`, marker.label])
       );
-      pagesEl.appendChild(buildMonthPage(year, month, seasonalMap));
+
+      let tides = null;
+      if (tideStation) {
+        try {
+          tides = await fetchTides(tideStation.id, year, month);
+        } catch (_) {
+          // render without tides if fetch fails
+        }
+      }
+
+      pagesEl.appendChild(buildMonthPage(year, month, seasonalMap, tides));
       document.title = `Almanac — ${monthNames[month]} ${year}`;
     }
 
-    function buildMonthPage(year, month, seasonalMap) {
+    async function findTidesForCity(city) {
+      if (!city) return;
+      stationLabel.textContent = "Searching…";
+      tidesBtn.disabled = true;
+
+      try {
+        const geo = await geocodeCity(city);
+        if (!geo) {
+          stationLabel.textContent = "City not found — try a different name.";
+          return;
+        }
+
+        stationLabel.textContent = "Loading tide stations…";
+        const stations = await loadNoaaStations();
+
+        const station = findNearestStation(geo.lat, geo.lon, stations);
+        const distKm = Math.round(haversine(geo.lat, geo.lon, parseFloat(station.lat), parseFloat(station.lng)));
+
+        tideStation = station;
+        tideCache = {};
+
+        const distNote = distKm > 300 ? ` — ${distKm} km away, tides may not apply` : ` (${distKm} km)`;
+        stationLabel.textContent = `${station.name}${station.state ? ", " + station.state : ""}${distNote}`;
+
+        await renderMonth(parseYearInput(), parseMonthSelect());
+      } catch (err) {
+        stationLabel.textContent = `Error: ${err.message}`;
+      } finally {
+        tidesBtn.disabled = false;
+      }
+    }
+
+    async function geocodeCity(city) {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.length) return null;
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+
+    async function loadNoaaStations() {
+      if (noaaStations) return noaaStations;
+      const res = await fetch("https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions");
+      const data = await res.json();
+      noaaStations = data.stations;
+      return noaaStations;
+    }
+
+    function findNearestStation(lat, lon, stations) {
+      let nearest = null;
+      let nearestDist = Infinity;
+      for (const s of stations) {
+        const d = haversine(lat, lon, parseFloat(s.lat), parseFloat(s.lng));
+        if (d < nearestDist) {
+          nearestDist = d;
+          nearest = s;
+        }
+      }
+      return nearest;
+    }
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    async function fetchTides(stationId, year, month) {
+      const key = `${stationId}-${year}-${month}`;
+      if (tideCache[key]) return tideCache[key];
+
+      const pad = (n) => String(n).padStart(2, "0");
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const start = `${year}${pad(month + 1)}01`;
+      const end = `${year}${pad(month + 1)}${pad(lastDay)}`;
+
+      const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter` +
+        `?begin_date=${start}&end_date=${end}&station=${stationId}` +
+        `&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=hilo` +
+        `&units=english&application=almanac&format=json`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.predictions) return null;
+
+      const byDay = {};
+      for (const p of data.predictions) {
+        const day = Number.parseInt(p.t.slice(8, 10), 10);
+        if (!byDay[day]) byDay[day] = [];
+        byDay[day].push({
+          type: p.type,
+          time: formatTideTime(p.t.slice(11, 16)),
+          height: parseFloat(p.v).toFixed(1)
+        });
+      }
+
+      tideCache[key] = byDay;
+      return byDay;
+    }
+
+    function formatTideTime(hhmm) {
+      const [hStr, mStr] = hhmm.split(":");
+      let h = Number.parseInt(hStr, 10);
+      const suffix = h >= 12 ? "p" : "a";
+      h = h % 12 || 12;
+      return `${h}:${mStr}${suffix}`;
+    }
+
+    function buildMonthPage(year, month, seasonalMap, tides) {
       const page = document.createElement("article");
-      page.className = "page";
+      page.className = `page${tides ? " has-tides" : ""}`;
 
       const monthStart = new Date(year, month, 1);
       const monthEnd = new Date(year, month + 1, 0);
@@ -572,7 +758,7 @@
         </section>
       `;
 
-      page.appendChild(buildCalendarTable(year, month, gridStart, seasonalMap));
+      page.appendChild(buildCalendarTable(year, month, gridStart, seasonalMap, tides));
 
       const notesGrid = document.createElement("section");
       notesGrid.className = "notes-grid";
@@ -592,14 +778,14 @@
       footer.className = "footer-line";
       footer.innerHTML = `
         <span>Calendar prepared for ${year}</span>
-        <span>Almanac-style annual reference</span>
+        <span>${tideStation ? `Tides: ${tideStation.name}` : "Almanac-style annual reference"}</span>
       `;
       page.appendChild(footer);
 
       return page;
     }
 
-    function buildCalendarTable(year, month, gridStart, seasonalMap) {
+    function buildCalendarTable(year, month, gridStart, seasonalMap, tides) {
       const table = document.createElement("table");
       table.className = "calendar";
 
@@ -628,6 +814,7 @@
           const holiday = holidays[`${date.getMonth() + 1}-${date.getDate()}`] || "";
           const season = seasonalMap.get(key) || "";
           const note = naturalNote(date);
+          const dayTides = (tides && inMonth) ? tides[date.getDate()] : null;
 
           cell.className = `day${inMonth ? "" : " off-month"}${isToday(date) ? " today" : ""}`;
           cell.innerHTML = `
@@ -638,6 +825,7 @@
             ${holiday ? `<span class="day-holiday">${holiday}</span>` : ""}
             ${season ? `<span class="day-season">${season}</span>` : ""}
             <span class="day-note">${note}</span>
+            ${dayTides ? buildTideHtml(dayTides) : ""}
           `;
 
           row.appendChild(cell);
@@ -648,6 +836,13 @@
 
       table.appendChild(tbody);
       return table;
+    }
+
+    function buildTideHtml(events) {
+      const lines = events.map((e) =>
+        `<span class="tide-${e.type}">${e.type === "H" ? "▲" : "▼"} ${e.time} ${e.height}′</span>`
+      ).join("<br>");
+      return `<div class="tide-info">${lines}</div>`;
     }
 
     function seasonName(month) {
