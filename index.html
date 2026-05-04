@@ -112,11 +112,21 @@
       background: rgba(255, 247, 230, 0.9);
     }
 
+    select {
+      padding: 10px 14px;
+      border: 1px solid rgba(76, 51, 25, 0.24);
+      border-radius: 999px;
+      font: inherit;
+      background: rgba(255, 250, 238, 0.95);
+      color: var(--ink);
+      cursor: pointer;
+    }
+
     .pages {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns: 1fr;
       gap: 22px;
-      max-width: 1280px;
+      max-width: 900px;
       margin: 0 auto;
     }
 
@@ -393,11 +403,26 @@
         <p>Generate an old almanac-style monthly calendar for any year, ready to browse or print.</p>
       </div>
       <div class="controls">
+        <label for="monthSelect">Month</label>
+        <select id="monthSelect">
+          <option value="0">January</option>
+          <option value="1">February</option>
+          <option value="2">March</option>
+          <option value="3">April</option>
+          <option value="4">May</option>
+          <option value="5">June</option>
+          <option value="6">July</option>
+          <option value="7">August</option>
+          <option value="8">September</option>
+          <option value="9">October</option>
+          <option value="10">November</option>
+          <option value="11">December</option>
+        </select>
         <label for="yearInput">Year</label>
         <input id="yearInput" type="number" min="1" max="9999" step="1">
-        <button id="generateBtn">Generate Year</button>
-        <button id="currentBtn" class="secondary">Current Year</button>
-        <button id="printBtn" class="secondary">Print Pages</button>
+        <button id="generateBtn">Generate</button>
+        <button id="currentBtn" class="secondary">Today</button>
+        <button id="printBtn" class="secondary">Print</button>
       </div>
     </section>
 
@@ -467,24 +492,26 @@
     const today = new Date();
     const pagesEl = document.getElementById("pages");
     const yearInput = document.getElementById("yearInput");
+    const monthSelect = document.getElementById("monthSelect");
     const generateBtn = document.getElementById("generateBtn");
     const currentBtn = document.getElementById("currentBtn");
     const printBtn = document.getElementById("printBtn");
 
     yearInput.value = today.getFullYear();
+    monthSelect.value = today.getMonth();
 
-    generateBtn.addEventListener("click", () => renderYear(parseYearInput()));
+    generateBtn.addEventListener("click", () => renderMonth(parseYearInput(), parseMonthSelect()));
     currentBtn.addEventListener("click", () => {
       yearInput.value = today.getFullYear();
-      renderYear(today.getFullYear());
+      monthSelect.value = today.getMonth();
+      renderMonth(today.getFullYear(), today.getMonth());
     });
     printBtn.addEventListener("click", () => window.print());
 
     yearInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        renderYear(parseYearInput());
-      }
+      if (event.key === "Enter") renderMonth(parseYearInput(), parseMonthSelect());
     });
+    monthSelect.addEventListener("change", () => renderMonth(parseYearInput(), parseMonthSelect()));
 
     function parseYearInput() {
       const year = Number.parseInt(yearInput.value, 10);
@@ -495,16 +522,17 @@
       return year;
     }
 
-    function renderYear(year) {
+    function parseMonthSelect() {
+      return Number.parseInt(monthSelect.value, 10);
+    }
+
+    function renderMonth(year, month) {
       pagesEl.innerHTML = "";
       const seasonalMap = new Map(
         fixedSeasonMarkers.map((marker) => [`${marker.month}-${marker.day}`, marker.label])
       );
-
-      for (let month = 0; month < 12; month += 1) {
-        pagesEl.appendChild(buildMonthPage(year, month, seasonalMap));
-      }
-      document.title = `Almanac Calendar Pages ${year}`;
+      pagesEl.appendChild(buildMonthPage(year, month, seasonalMap));
+      document.title = `Almanac — ${monthNames[month]} ${year}`;
     }
 
     function buildMonthPage(year, month, seasonalMap) {
@@ -728,7 +756,7 @@
         && date.getDate() === today.getDate();
     }
 
-    renderYear(today.getFullYear());
+    renderMonth(today.getFullYear(), today.getMonth());
   </script>
 </body>
 </html>
