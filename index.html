@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Almanac Calendar Pages</title>
+  <style>
+    :root {
+      --paper: #efe3c6;
+      --paper-deep: #e5d4ac;
+      --ink: #2e2214;
+      --muted: #6b573c;
+      --accent: #8f5c2c;
+      --accent-soft: rgba(143, 92, 44, 0.12);
+      --frame: #b28c52;
+      --grid: rgba(61, 41, 17, 0.18);
+      --shadow: rgba(58, 35, 9, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      background:
+        radial-gradient(circle at top, rgba(255, 245, 212, 0.45), transparent 32%),
+        linear-gradient(180deg, #c3ac7b 0%, #9f8455 100%);
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .control-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 auto 24px;
+      padding: 16px 18px;
+      max-width: 1280px;
+      border: 1px solid rgba(70, 45, 18, 0.24);
+      border-radius: 18px;
+      background: rgba(245, 236, 214, 0.86);
+      box-shadow: 0 12px 30px var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .control-copy h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .control-copy p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    label {
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    input,
+    button {
+      border: 1px solid rgba(76, 51, 25, 0.24);
+      border-radius: 999px;
+      font: inherit;
+    }
+
+    input {
+      width: 108px;
+      padding: 10px 14px;
+      background: rgba(255, 250, 238, 0.95);
+      color: var(--ink);
+    }
+
+    button {
+      padding: 10px 16px;
+      color: #fff8eb;
+      background: linear-gradient(180deg, #9d6b35 0%, #7f5223 100%);
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease;
+      box-shadow: 0 8px 20px rgba(75, 44, 14, 0.18);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(75, 44, 14, 0.24);
+    }
+
+    button.secondary {
+      color: var(--ink);
+      background: rgba(255, 247, 230, 0.9);
+    }
+
+    .pages {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 22px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .page {
+      position: relative;
+      min-height: 900px;
+      padding: 24px;
+      border: 3px double var(--frame);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(255, 252, 242, 0.32), transparent 22%),
+        linear-gradient(135deg, rgba(179, 137, 64, 0.12), transparent 45%),
+        var(--paper);
+      box-shadow: 0 18px 40px var(--shadow);
+      overflow: hidden;
+    }
+
+    .page::before,
+    .page::after {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border: 1px solid rgba(130, 97, 52, 0.14);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+    .page::after {
+      inset: auto 28px 18px;
+      top: 96px;
+      border: 0;
+      border-top: 1px solid rgba(130, 97, 52, 0.14);
+    }
+
+    .month-head {
+      position: relative;
+      text-align: center;
+      padding-bottom: 16px;
+    }
+
+    .month-kicker {
+      margin: 0;
+      font-size: 0.82rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .month-title {
+      margin: 8px 0 6px;
+      font-size: clamp(2rem, 4vw, 2.7rem);
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .month-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 18px 0;
+    }
+
+    .summary-card {
+      padding: 10px;
+      border: 1px solid rgba(95, 69, 30, 0.22);
+      border-radius: 10px;
+      background: rgba(255, 248, 230, 0.55);
+      text-align: center;
+    }
+
+    .summary-card strong {
+      display: block;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .summary-card span {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.98rem;
+    }
+
+    .calendar {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: rgba(255, 251, 241, 0.5);
+    }
+
+    .calendar th,
+    .calendar td {
+      border: 1px solid var(--grid);
+      vertical-align: top;
+    }
+
+    .calendar th {
+      padding: 8px 4px;
+      background: rgba(132, 95, 46, 0.14);
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .week-num-head,
+    .week-num {
+      width: 34px;
+      font-size: 0.76rem;
+      color: var(--muted);
+      text-align: center;
+      background: rgba(107, 87, 60, 0.06);
+    }
+
+    .calendar td.day {
+      height: 100px;
+      padding: 7px 8px 8px;
+    }
+
+    .day.off-month {
+      background: rgba(112, 91, 58, 0.08);
+      color: rgba(46, 34, 20, 0.45);
+    }
+
+    .day.today {
+      box-shadow: inset 0 0 0 2px rgba(157, 107, 53, 0.6);
+    }
+
+    .date-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: baseline;
+    }
+
+    .date-num {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .moon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .day-note,
+    .day-holiday,
+    .day-season {
+      display: block;
+      margin-top: 4px;
+      line-height: 1.15;
+      font-size: 0.73rem;
+    }
+
+    .day-holiday {
+      color: #7a2f18;
+      font-weight: 700;
+    }
+
+    .day-season {
+      color: #355d2d;
+      font-weight: 700;
+    }
+
+    .notes-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .panel {
+      padding: 12px;
+      border: 1px solid rgba(95, 69, 30, 0.22);
+      border-radius: 12px;
+      background: rgba(255, 248, 230, 0.5);
+    }
+
+    .panel h3 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .panel p,
+    .panel ul {
+      margin: 0;
+      font-size: 0.84rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .panel ul {
+      padding-left: 18px;
+    }
+
+    .footer-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 780px) {
+      .app-shell {
+        padding: 14px;
+      }
+
+      .control-bar {
+        padding: 14px;
+      }
+
+      .page {
+        min-height: auto;
+        padding: 18px;
+      }
+
+      .summary-strip,
+      .notes-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .calendar td.day {
+        height: 88px;
+        padding: 6px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .app-shell {
+        padding: 0;
+      }
+
+      .control-bar {
+        display: none;
+      }
+
+      .pages {
+        display: block;
+        max-width: none;
+      }
+
+      .page {
+        break-after: page;
+        box-shadow: none;
+        min-height: 10.2in;
+        border-radius: 0;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <section class="control-bar">
+      <div class="control-copy">
+        <h1>Almanac Calendar Pages</h1>
+        <p>Generate an old almanac-style monthly calendar for any year, ready to browse or print.</p>
+      </div>
+      <div class="controls">
+        <label for="yearInput">Year</label>
+        <input id="yearInput" type="number" min="1" max="9999" step="1">
+        <button id="generateBtn">Generate Year</button>
+        <button id="currentBtn" class="secondary">Current Year</button>
+        <button id="printBtn" class="secondary">Print Pages</button>
+      </div>
+    </section>
+
+    <main id="pages" class="pages" aria-live="polite"></main>
+  </div>
+
+  <script>
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    const monthLore = [
+      "Deep winter invites planning, pruning, and patient observation.",
+      "A short month that rewards steady work and signs of thaw.",
+      "Soil wakes, birds return, and the year leans toward spring.",
+      "Rain, seed trays, and a quickening greenness fill the days.",
+      "Longer light brings bloom, planting, and frequent field notes.",
+      "The garden stretches fast under high sun and warm evenings.",
+      "Harvest begins in earnest as summer reaches its full stride.",
+      "Store, preserve, and water wisely through the season's heat.",
+      "Cool mornings hint at autumn and the turn toward abundance.",
+      "Leaves color, woodpiles rise, and the weather turns brisk.",
+      "Frosty dawns and shorter days favor mending and reflection.",
+      "The year closes in candlelight, planning, and winter rest."
+    ];
+
+    const zodiacByMonth = [
+      "Capricorn / Aquarius",
+      "Aquarius / Pisces",
+      "Pisces / Aries",
+      "Aries / Taurus",
+      "Taurus / Gemini",
+      "Gemini / Cancer",
+      "Cancer / Leo",
+      "Leo / Virgo",
+      "Virgo / Libra",
+      "Libra / Scorpio",
+      "Scorpio / Sagittarius",
+      "Sagittarius / Capricorn"
+    ];
+
+    const holidays = {
+      "1-1": "New Year's Day",
+      "2-14": "Valentine's Day",
+      "3-17": "St. Patrick's Day",
+      "4-22": "Earth Day",
+      "5-1": "May Day",
+      "6-19": "Juneteenth",
+      "7-4": "Independence Day",
+      "10-31": "Halloween",
+      "11-11": "Veterans Day",
+      "12-24": "Christmas Eve",
+      "12-25": "Christmas Day",
+      "12-31": "New Year's Eve"
+    };
+
+    const fixedSeasonMarkers = [
+      { month: 2, day: 20, label: "Spring Begins" },
+      { month: 5, day: 21, label: "Summer Begins" },
+      { month: 8, day: 22, label: "Autumn Begins" },
+      { month: 11, day: 21, label: "Winter Begins" }
+    ];
+
+    const today = new Date();
+    const pagesEl = document.getElementById("pages");
+    const yearInput = document.getElementById("yearInput");
+    const generateBtn = document.getElementById("generateBtn");
+    const currentBtn = document.getElementById("currentBtn");
+    const printBtn = document.getElementById("printBtn");
+
+    yearInput.value = today.getFullYear();
+
+    generateBtn.addEventListener("click", () => renderYear(parseYearInput()));
+    currentBtn.addEventListener("click", () => {
+      yearInput.value = today.getFullYear();
+      renderYear(today.getFullYear());
+    });
+    printBtn.addEventListener("click", () => window.print());
+
+    yearInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        renderYear(parseYearInput());
+      }
+    });
+
+    function parseYearInput() {
+      const year = Number.parseInt(yearInput.value, 10);
+      if (Number.isNaN(year) || year < 1 || year > 9999) {
+        yearInput.value = today.getFullYear();
+        return today.getFullYear();
+      }
+      return year;
+    }
+
+    function renderYear(year) {
+      pagesEl.innerHTML = "";
+      const seasonalMap = new Map(
+        fixedSeasonMarkers.map((marker) => [`${marker.month}-${marker.day}`, marker.label])
+      );
+
+      for (let month = 0; month < 12; month += 1) {
+        pagesEl.appendChild(buildMonthPage(year, month, seasonalMap));
+      }
+      document.title = `Almanac Calendar Pages ${year}`;
+    }
+
+    function buildMonthPage(year, month, seasonalMap) {
+      const page = document.createElement("article");
+      page.className = "page";
+
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
+      const totalDays = monthEnd.getDate();
+      const firstWeekday = monthStart.getDay();
+      const gridStart = new Date(year, month, 1 - firstWeekday);
+      const monthMoon = collectMonthMoonPhases(year, month);
+
+      page.innerHTML = `
+        <header class="month-head">
+          <p class="month-kicker">${year}</p>
+          <h2 class="month-title">${monthNames[month]}</h2>
+          <p class="month-subtitle">${monthLore[month]}</p>
+        </header>
+        <section class="summary-strip">
+          <div class="summary-card">
+            <strong>Days</strong>
+            <span>${totalDays}</span>
+          </div>
+          <div class="summary-card">
+            <strong>Season</strong>
+            <span>${seasonName(month)}</span>
+          </div>
+          <div class="summary-card">
+            <strong>Zodiac</strong>
+            <span>${zodiacByMonth[month]}</span>
+          </div>
+          <div class="summary-card">
+            <strong>Moon Notes</strong>
+            <span>${monthMoon.summary}</span>
+          </div>
+        </section>
+      `;
+
+      page.appendChild(buildCalendarTable(year, month, gridStart, seasonalMap));
+
+      const notesGrid = document.createElement("section");
+      notesGrid.className = "notes-grid";
+      notesGrid.innerHTML = `
+        <div class="panel">
+          <h3>Month Notes</h3>
+          <p>${buildMonthNotes(year, month)}</p>
+        </div>
+        <div class="panel">
+          <h3>Principal Moon Phases</h3>
+          <ul>${monthMoon.listMarkup}</ul>
+        </div>
+      `;
+      page.appendChild(notesGrid);
+
+      const footer = document.createElement("div");
+      footer.className = "footer-line";
+      footer.innerHTML = `
+        <span>Calendar prepared for ${year}</span>
+        <span>Almanac-style annual reference</span>
+      `;
+      page.appendChild(footer);
+
+      return page;
+    }
+
+    function buildCalendarTable(year, month, gridStart, seasonalMap) {
+      const table = document.createElement("table");
+      table.className = "calendar";
+
+      const thead = document.createElement("thead");
+      thead.innerHTML = `
+        <tr>
+          <th class="week-num-head">Wk</th>
+          ${weekdayNames.map((day) => `<th>${day}</th>`).join("")}
+        </tr>
+      `;
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+
+      for (let week = 0; week < 6; week += 1) {
+        const row = document.createElement("tr");
+        const weekStart = addDays(gridStart, week * 7);
+        row.innerHTML = `<td class="week-num">${isoWeekNumber(weekStart)}</td>`;
+
+        for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+          const date = addDays(weekStart, dayIndex);
+          const cell = document.createElement("td");
+          const inMonth = date.getMonth() === month;
+          const moon = moonGlyph(date);
+          const key = `${date.getMonth()}-${date.getDate()}`;
+          const holiday = holidays[`${date.getMonth() + 1}-${date.getDate()}`] || "";
+          const season = seasonalMap.get(key) || "";
+          const note = naturalNote(date);
+
+          cell.className = `day${inMonth ? "" : " off-month"}${isToday(date) ? " today" : ""}`;
+          cell.innerHTML = `
+            <div class="date-row">
+              <span class="date-num">${date.getDate()}</span>
+              <span class="moon" aria-label="${moon.label}">${moon.glyph}</span>
+            </div>
+            ${holiday ? `<span class="day-holiday">${holiday}</span>` : ""}
+            ${season ? `<span class="day-season">${season}</span>` : ""}
+            <span class="day-note">${note}</span>
+          `;
+
+          row.appendChild(cell);
+        }
+
+        tbody.appendChild(row);
+      }
+
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function seasonName(month) {
+      if (month <= 1 || month === 11) return "Winter";
+      if (month <= 4) return "Spring";
+      if (month <= 7) return "Summer";
+      return "Autumn";
+    }
+
+    function buildMonthNotes(year, month) {
+      const leapText = isLeapYear(year) ? "Leap year." : "Common year.";
+      const firstDay = weekdayNames[new Date(year, month, 1).getDay()];
+      const lastDay = weekdayNames[new Date(year, month + 1, 0).getDay()];
+      return `${leapText} ${monthNames[month]} opens on ${firstDay} and closes on ${lastDay}. Use this page as a printable monthly reference with week numbers, approximate moon symbols, and classic seasonal markers.`;
+    }
+
+    function naturalNote(date) {
+      const notes = [
+        "Best for keeping records.",
+        "Watch the weather signs.",
+        "A fair day for mending.",
+        "Good light for planning.",
+        "Tend tools and stores.",
+        "Mind wind and rainfall.",
+        "A fitting day for travel."
+      ];
+      return notes[date.getDay()];
+    }
+
+    function moonGlyph(date) {
+      const phase = moonPhaseFraction(date);
+      if (phase < 0.0625 || phase >= 0.9375) return { glyph: "●", label: "New moon" };
+      if (phase < 0.1875) return { glyph: "◔", label: "Waxing crescent" };
+      if (phase < 0.3125) return { glyph: "◑", label: "First quarter" };
+      if (phase < 0.4375) return { glyph: "◕", label: "Waxing gibbous" };
+      if (phase < 0.5625) return { glyph: "○", label: "Full moon" };
+      if (phase < 0.6875) return { glyph: "◖", label: "Waning gibbous" };
+      if (phase < 0.8125) return { glyph: "◐", label: "Last quarter" };
+      return { glyph: "◗", label: "Waning crescent" };
+    }
+
+    function moonPhaseFraction(date) {
+      const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14, 0);
+      const synodicMonth = 29.530588853;
+      const daysSince = (Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - knownNewMoon) / 86400000;
+      const phase = ((daysSince / synodicMonth) % 1 + 1) % 1;
+      return phase;
+    }
+
+    function collectMonthMoonPhases(year, month) {
+      const labels = [
+        { target: 0, name: "New", glyph: "●" },
+        { target: 0.25, name: "First Quarter", glyph: "◑" },
+        { target: 0.5, name: "Full", glyph: "○" },
+        { target: 0.75, name: "Last Quarter", glyph: "◐" }
+      ];
+
+      const found = labels.map((label) => {
+        let bestDay = 1;
+        let bestDistance = Infinity;
+
+        for (let day = 1; day <= new Date(year, month + 1, 0).getDate(); day += 1) {
+          const phase = moonPhaseFraction(new Date(year, month, day));
+          const distance = circularDistance(phase, label.target);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestDay = day;
+          }
+        }
+
+        return `${label.glyph} ${label.name} ${bestDay}`;
+      });
+
+      return {
+        summary: found.map((entry) => entry.split(" ")[0]).join(" "),
+        listMarkup: found.map((entry) => `<li>${entry}</li>`).join("")
+      };
+    }
+
+    function circularDistance(a, b) {
+      const diff = Math.abs(a - b);
+      return Math.min(diff, 1 - diff);
+    }
+
+    function isoWeekNumber(date) {
+      const working = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const day = working.getUTCDay() || 7;
+      working.setUTCDate(working.getUTCDate() + 4 - day);
+      const yearStart = new Date(Date.UTC(working.getUTCFullYear(), 0, 1));
+      return Math.ceil((((working - yearStart) / 86400000) + 1) / 7);
+    }
+
+    function addDays(date, count) {
+      const next = new Date(date);
+      next.setDate(next.getDate() + count);
+      return next;
+    }
+
+    function isLeapYear(year) {
+      return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    }
+
+    function isToday(date) {
+      return date.getFullYear() === today.getFullYear()
+        && date.getMonth() === today.getMonth()
+        && date.getDate() === today.getDate();
+    }
+
+    renderYear(today.getFullYear());
+  </script>
+</body>
+</html>
